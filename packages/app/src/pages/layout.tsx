@@ -1792,6 +1792,9 @@ export default function Layout(props: ParentProps) {
           return
         }
 
+        if (!server.projects.list().some((p) => pathKey(p.worktree) === pathKey(root))) {
+          layout.projects.open(dir)
+        }
         if (server.projects.last() !== root) server.projects.touch(root)
 
         const changed = session !== activeRoute.session || dir !== activeRoute.directory
