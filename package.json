@@ -12,6 +12,8 @@
     "dev:console": "ulimit -n 10240 2>/dev/null; bun run --cwd packages/console/app dev",
     "dev:stats": "bun sst shell --stage=production -- bun run --cwd packages/stats/app dev",
     "dev:storybook": "bun --cwd packages/storybook storybook",
+    "build:tui": "bun run --cwd packages/opencode script/build.ts --single --skip-install --skip-embed-web-ui",
+    "build:desktop": "bun --cwd packages/desktop prebuild && bun --cwd packages/desktop build && bun --cwd packages/desktop package:win",
     "lint": "oxlint",
     "typecheck": "bun turbo typecheck",
     "upgrade-opentui": "bun run script/upgrade-opentui.ts",
@@ -107,6 +109,7 @@
     "turbo": "2.8.13"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "0.71.2",
     "@aws-sdk/client-s3": "3.933.0",
     "@opencode-ai/plugin": "workspace:*",
     "@opencode-ai/script": "workspace:*",
