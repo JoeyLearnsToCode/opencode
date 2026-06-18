@@ -479,7 +479,19 @@ export const { use: useLayout, provider: LayoutProvider } = createSimpleContext(
       })
     })
 
-    const enriched = createMemo(() => server.projects.list().map(enrich))
+    const enriched = createMemo(() => {
+      const serverProjects = serverSync().data.project ?? []
+      const seen = new Set<string>()
+      const worktrees: { worktree: string; expanded: boolean }[] = []
+
+      for (const p of serverProjects) {
+        if (!p.worktree || seen.has(p.worktree)) continue
+        seen.add(p.worktree)
+        worktrees.push({ worktree: p.worktree, expanded: true })
+      }
+
+      return worktrees.map(enrich)
+    })
     const list = createMemo(() => {
       const projects = enriched()
       return projects.map((project) => {

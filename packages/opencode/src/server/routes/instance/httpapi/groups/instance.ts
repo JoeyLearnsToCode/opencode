@@ -53,6 +53,7 @@ export const InstancePaths = {
   skill: "/skill",
   lsp: "/lsp",
   formatter: "/formatter",
+  openExplorer: "/open-explorer",
 } as const
 
 export const InstanceApi = HttpApi.make("instance")
@@ -184,6 +185,16 @@ export const InstanceApi = HttpApi.make("instance")
             identifier: "formatter.status",
             summary: "Get formatter status",
             description: "Get formatter status",
+          }),
+        ),
+        HttpApiEndpoint.get("openExplorer", InstancePaths.openExplorer, {
+          query: WorkspaceRoutingQuery,
+          success: described(Schema.Boolean, "Opened in file explorer"),
+        }).annotateMerge(
+          OpenApi.annotations({
+            identifier: "instance.openExplorer",
+            summary: "Open in file explorer",
+            description: "Open a directory in the system file manager (Explorer/Finder).",
           }),
         ),
       )

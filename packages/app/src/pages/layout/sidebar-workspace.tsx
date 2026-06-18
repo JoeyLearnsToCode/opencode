@@ -18,8 +18,8 @@ import { useServerSync, useQueryOptions } from "@/context/server-sync"
 import { useLanguage } from "@/context/language"
 import { pathKey } from "@/utils/path-key"
 import { NewSessionItem, SessionItem, SessionSkeleton } from "./sidebar-items"
-import { sortedRootSessions } from "./helpers"
-import { useIsFetching } from "@tanstack/solid-query"
+import { catalogSessionsForDirectory } from "./helpers"
+import { useExperimentalSessions } from "@/context/experimental-sessions"
 
 type InlineEditorComponent = (props: {
   id: string
@@ -302,6 +302,8 @@ export const SortableWorkspace = (props: {
   const serverSync = useServerSync()
   const queryOptions = useQueryOptions()
   const language = useLanguage()
+  const catalog = useExperimentalSessions()
+  const allSessions = () => catalog.data?.sessions ?? []
   const sortable = createSortable(props.directory)
   const [workspaceStore, setWorkspaceStore] = serverSync().child(props.directory, { bootstrap: false })
   const [menu, setMenu] = createStore({
@@ -309,7 +311,7 @@ export const SortableWorkspace = (props: {
     pendingRename: false,
   })
   const slug = createMemo(() => base64Encode(props.directory))
-  const sessions = createMemo(() => sortedRootSessions(workspaceStore, props.sortNow()))
+  const sessions = createMemo(() => catalogSessionsForDirectory(allSessions(), props.directory, props.sortNow()))
   const local = createMemo(() => props.directory === props.project.worktree)
   const active = createMemo(() => pathKey(props.ctx.currentDir()) === pathKey(props.directory))
   const workspaceValue = createMemo(() => {
@@ -320,16 +322,12 @@ export const SortableWorkspace = (props: {
   const open = createMemo(() => props.ctx.workspaceExpanded(props.directory, local()))
   const boot = createMemo(() => open() || active())
   const count = createMemo(() => sessions()?.length ?? 0)
-  const hasMore = createMemo(() => workspaceStore.sessionTotal > count())
-  const fetching = useIsFetching(() => queryOptions().sessions(pathKey(props.directory)))
+  const hasMore = createMemo(() => false)
   const busy = createMemo(() => props.ctx.isBusy(props.directory))
-  const loading = () => fetching() > 0 && count() === 0
+  const loading = () => catalog.isLoading && count() === 0
   const touch = createMediaQuery("(hover: none)")
   const showNew = createMemo(() => !loading() && (touch() || count() === 0 || (active() && !params.id)))
-  const loadMore = async () => {
-    setWorkspaceStore("limit", (limit) => (limit ?? 0) + 5)
-    await serverSync().project.loadSessions(props.directory)
-  }
+  const loadMore = async () => {}
 
   const workspaceEditActive = createMemo(() => props.ctx.editorOpen(`workspace:${props.directory}`))
   const header = () => (
@@ -449,20 +447,18 @@ export const LocalWorkspace = (props: {
   const serverSync = useServerSync()
   const queryOptions = useQueryOptions()
   const language = useLanguage()
+  const catalog = useExperimentalSessions()
+  const allSessions = () => catalog.data?.sessions ?? []
   const workspace = createMemo(() => {
     const [store, setStore] = serverSync().child(props.project.worktree)
     return { store, setStore }
   })
   const slug = createMemo(() => base64Encode(props.project.worktree))
-  const sessions = createMemo(() => sortedRootSessions(workspace().store, props.sortNow()))
+  const sessions = createMemo(() => catalogSessionsForDirectory(allSessions(), props.project.worktree, props.sortNow()))
   const count = createMemo(() => sessions()?.length ?? 0)
-  const fetching = useIsFetching(() => queryOptions().sessions(pathKey(props.project.worktree)))
-  const hasMore = createMemo(() => workspace().store.sessionTotal > count())
-  const loading = () => fetching() > 0 && count() === 0
-  const loadMore = async () => {
-    workspace().setStore("limit", (limit) => (limit ?? 0) + 5)
-    await serverSync().project.loadSessions(props.project.worktree)
-  }
+  const hasMore = createMemo(() => false)
+  const loading = () => catalog.isLoading && count() === 0
+  const loadMore = async () => {}
 
   return (
     <div

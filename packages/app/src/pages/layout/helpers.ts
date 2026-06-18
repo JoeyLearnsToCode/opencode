@@ -1,5 +1,5 @@
 import { getFilename } from "@opencode-ai/core/util/path"
-import { type Session } from "@opencode-ai/sdk/v2/client"
+import { type Session, type GlobalSession } from "@opencode-ai/sdk/v2/client"
 import { pathKey } from "@/utils/path-key"
 import type { ServerConnection } from "@/context/server"
 
@@ -148,4 +148,16 @@ export const effectiveWorkspaceOrder = (local: string, dirs: string[], persisted
   }
 
   return [...result, ...live.values()]
+}
+
+export function catalogSessionsForProject(sessions: GlobalSession[], worktree: string, now: number) {
+  return sessions
+    .filter((s) => s.project?.worktree === worktree && !s.parentID && !s.time?.archived)
+    .sort(sortSessions(now))
+}
+
+export function catalogSessionsForDirectory(sessions: GlobalSession[], directory: string, now: number) {
+  return sessions
+    .filter((s) => pathKey(s.directory) === pathKey(directory) && !s.parentID && !s.time?.archived)
+    .sort(sortSessions(now))
 }
