@@ -6790,4 +6790,11 @@ export class OpencodeClient extends HeyApiClient {
   get v2(): V2 {
     return (this._v2 ??= new V2({ client: this.client }))
   }
+
+  openExplorer(path: string) {
+    return this.client.get({
+      url: "/open-explorer",
+      query: { directory: path },
+    })
+  }
 }

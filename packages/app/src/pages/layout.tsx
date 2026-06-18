@@ -105,6 +105,8 @@ export default function Layout(props: ParentProps) {
       workspaceBranchName: {} as Record<string, Record<string, string>>,
       workspaceExpanded: {} as Record<string, boolean>,
       gettingStartedDismissed: false,
+      closedProjects: [] as string[],
+      projectOrder: [] as string[],
     }),
   )
 
@@ -227,6 +229,14 @@ export default function Layout(props: ParentProps) {
     if (sizet !== undefined) clearTimeout(sizet)
     if (peekt !== undefined) clearTimeout(peekt)
     aim.reset()
+  })
+
+  createEffect(() => {
+    const projects = layout.projects.list()
+    const known = new Set(store.projectOrder.map(pathKey))
+    const missing = projects.filter((p) => !known.has(pathKey(p.worktree)))
+    if (missing.length === 0) return
+    setStore("projectOrder", [...store.projectOrder, ...missing.map((p) => pathKey(p.worktree))])
   })
 
   onMount(() => {
@@ -521,6 +531,29 @@ export default function Layout(props: ParentProps) {
     }
     setState("scrollSessionKey", sessionKey)
     element.scrollIntoView({ block: "nearest", behavior: "smooth" })
+  }
+
+  const openingDirs = new Set<string>()
+
+  async function openPathIfExists(dir: string) {
+    const key = pathKey(dir)
+    if (openingDirs.has(key)) return
+    openingDirs.add(key)
+    try {
+      const normalized = dir.replaceAll("\\", "/")
+      const result = await serverSDK().client.file.list({ directory: normalized, path: "" })
+      if (result.error) {
+        const last = server.projects.last()
+        if (last) navigateToProject(last)
+        return
+      }
+      if (store.closedProjects.includes(key)) {
+        setStore("closedProjects", store.closedProjects.filter((k) => k !== key))
+      }
+      layout.projects.open(dir)
+    } finally {
+      openingDirs.delete(key)
+    }
   }
 
   const currentProject = createMemo(() => {
@@ -1360,6 +1393,10 @@ export default function Layout(props: ParentProps) {
   }
 
   function openProject(directory: string, navigate = true) {
+    const key = pathKey(directory)
+    if (store.closedProjects.includes(key)) {
+      setStore("closedProjects", store.closedProjects.filter((k) => k !== key))
+    }
     layout.projects.open(directory)
     if (navigate) return navigateToProject(directory)
   }
@@ -1416,23 +1453,22 @@ export default function Layout(props: ParentProps) {
   }
 
   function closeProject(directory: string) {
-    const list = layout.projects.list()
     const key = pathKey(directory)
-    const index = list.findIndex((x) => pathKey(x.worktree) === key)
     const active = pathKey(currentProject()?.worktree ?? "") === key
-    if (index === -1) return
 
-    if (!active) {
-      layout.projects.close(directory)
-      return
+    if (!store.closedProjects.includes(key)) {
+      setStore("closedProjects", [...store.closedProjects, key])
     }
 
-    if (list.length === 1) {
-      layout.projects.close(directory)
+    if (!active) return
+
+    const list = layout.projects.list()
+    if (list.length <= 1) {
       navigate("/")
       return
     }
 
+    const index = list.findIndex((x) => pathKey(x.worktree) === key)
     const next = list[index + 1] ?? list[index - 1]
 
     navigateWithSidebarReset(`/${base64Encode(next.worktree)}/session`)
@@ -1770,41 +1806,55 @@ export default function Layout(props: ParentProps) {
       },
       ([ready, slug, id, root, dir]) => {
         if (!ready || !slug || !dir) {
+          if (slug && !dir) {
+            const last = server.projects.last()
+            if (last) navigateToProject(last)
+          }
           activeRoute.session = ""
           activeRoute.sessionProject = ""
           activeRoute.directory = ""
           return
+        }
+
+        const resolvedRoot = root ?? projectRoot(dir)
+
+        if (resolvedRoot) {
+          const inServerList = server.projects.list().some((p) => pathKey(p.worktree) === pathKey(resolvedRoot))
+          const closed = store.closedProjects.includes(pathKey(resolvedRoot))
+          if (!inServerList || closed) {
+            void openPathIfExists(dir)
+          }
         }
 
         if (!id) {
           activeRoute.session = ""
           activeRoute.sessionProject = ""
-          activeRoute.directory = ""
+          activeRoute.directory = dir
           return
         }
 
         const session = `${slug}/${id}`
 
-        if (!root) {
+        if (!resolvedRoot) {
           activeRoute.session = session
           activeRoute.directory = dir
           activeRoute.sessionProject = ""
           return
         }
 
-        if (server.projects.last() !== root) server.projects.touch(root)
+        if (server.projects.last() !== resolvedRoot) server.projects.touch(resolvedRoot)
 
         const changed = session !== activeRoute.session || dir !== activeRoute.directory
         if (changed) {
           activeRoute.session = session
           activeRoute.directory = dir
-          activeRoute.sessionProject = syncSessionRoute(dir, id, root)
+          activeRoute.sessionProject = syncSessionRoute(dir, id, resolvedRoot)
           return
         }
 
-        if (root === activeRoute.sessionProject) return
+        if (resolvedRoot === activeRoute.sessionProject) return
         activeRoute.directory = dir
-        activeRoute.sessionProject = rememberSessionRoute(dir, id, root)
+        activeRoute.sessionProject = rememberSessionRoute(dir, id, resolvedRoot)
       },
     ),
   )
@@ -1855,11 +1905,23 @@ export default function Layout(props: ParentProps) {
   function handleDragOver(event: DragEvent) {
     const { draggable, droppable } = event
     if (draggable && droppable) {
-      const projects = layout.projects.list()
-      const fromIndex = projects.findIndex((p) => p.worktree === draggable.id.toString())
-      const toIndex = projects.findIndex((p) => p.worktree === droppable.id.toString())
+      const visible = projects()
+      const fromIndex = visible.findIndex((p) => p.worktree === draggable.id.toString())
+      const toIndex = visible.findIndex((p) => p.worktree === droppable.id.toString())
       if (fromIndex !== toIndex && toIndex !== -1) {
-        layout.projects.move(draggable.id.toString(), toIndex)
+        const order = [...store.projectOrder]
+        const key = pathKey(draggable.id.toString())
+        const target = pathKey(visible[toIndex].worktree)
+        const fromOrder = order.indexOf(key)
+        if (fromOrder === -1) {
+          order.push(key)
+        }
+        const toOrder = order.indexOf(target)
+        if (fromOrder !== -1 && toOrder !== -1) {
+          order.splice(fromOrder, 1)
+          order.splice(order.indexOf(target), 0, key)
+          setStore("projectOrder", order)
+        }
       }
     }
   }
@@ -2325,7 +2387,23 @@ export default function Layout(props: ParentProps) {
     )
   }
 
-  const projects = () => layout.projects.list()
+  const projects = createMemo(() => {
+    const order = store.projectOrder
+    const all = layout.projects.list()
+    const visible = all.filter((p) => !store.closedProjects.includes(pathKey(p.worktree)))
+
+    if (order.length === 0) return visible
+
+    const idx = new Map(order.map((k, i) => [k, i]))
+    return [...visible].sort((a, b) => {
+      const ai = idx.get(pathKey(a.worktree))
+      const bi = idx.get(pathKey(b.worktree))
+      if (ai !== undefined && bi !== undefined) return ai - bi
+      if (ai !== undefined) return -1
+      if (bi !== undefined) return 1
+      return 0
+    })
+  })
   const projectOverlay = () => <ProjectDragOverlay projects={projects} activeProject={() => store.activeProject} />
   const sidebarContent = (mobile?: boolean) => (
     <SidebarContent

@@ -6,6 +6,9 @@ import { Global } from "@opencode-ai/core/global"
 import { LSP } from "@/lsp/lsp"
 import { Vcs } from "@/project/vcs"
 import { Skill } from "@/skill"
+import { execFile } from "node:child_process"
+import { promisify } from "node:util"
+import path from "node:path"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import { InstanceHttpApi } from "../api"
@@ -93,6 +96,20 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       return yield* format.status()
     })
 
+    const openExplorer = Effect.fn("InstanceHttpApi.openExplorer")(function* (ctx: {
+      query: { directory?: string; workspace?: string }
+    }) {
+      const raw = ctx.query.directory || ""
+      if (!raw) return false
+      const dir = path.resolve(raw)
+      const cmd = process.platform === "darwin" ? "open" : process.platform === "win32" ? "explorer" : "xdg-open"
+      const args = process.platform === "win32" ? [dir] : [dir]
+      const result = yield* Effect.tryPromise(() => promisify(execFile)(cmd, args).then(() => true)).pipe(
+        Effect.catch(() => Effect.succeed(false)),
+      )
+      return result
+    })
+
     return handlers
       .handle("dispose", dispose)
       .handle("path", getPath)
@@ -106,5 +123,6 @@ export const instanceHandlers = HttpApiBuilder.group(InstanceHttpApi, "instance"
       .handle("skill", getSkill)
       .handle("lsp", getLsp)
       .handle("formatter", getFormatter)
+      .handle("openExplorer", openExplorer)
   }),
 )

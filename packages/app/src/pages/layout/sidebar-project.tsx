@@ -8,10 +8,15 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { createSortable } from "@thisbeyond/solid-dnd"
 import { useLayout, type LocalProject } from "@/context/layout"
 import { useServerSync } from "@/context/server-sync"
+import { useServerSDK } from "@/context/server-sdk"
+import { usePlatform } from "@/context/platform"
 import { useLanguage } from "@/context/language"
 import { useNotification } from "@/context/notification"
 import { ProjectIcon, SessionItem, type SessionItemProps } from "./sidebar-items"
-import { displayName, sortedRootSessions } from "./helpers"
+import { displayName, catalogSessionsForProject, catalogSessionsForDirectory } from "./helpers"
+import { pathKey } from "@/utils/path-key"
+import { type GlobalSession } from "@opencode-ai/sdk/v2/client"
+import { useExperimentalSessions } from "@/context/experimental-sessions"
 
 export type ProjectSidebarContext = {
   currentDir: Accessor<string>
@@ -75,9 +80,20 @@ const ProjectTile = (props: {
 }): JSX.Element => {
   const notification = useNotification()
   const layout = useLayout()
+  const platform = usePlatform()
+  const serverSDK = useServerSDK()
   const unseenCount = createMemo(() =>
     props.dirs().reduce((total, directory) => total + notification.project.unseenCount(directory), 0),
   )
+
+  const openInExplorer = () => {
+    const dir = props.project.worktree
+    if (platform.openPath) {
+      platform.openPath(dir).catch(() => {})
+    } else {
+      serverSDK().client.openExplorer(dir.replaceAll("\\", "/")).catch(() => {})
+    }
+  }
 
   const clear = () =>
     props
@@ -151,6 +167,15 @@ const ProjectTile = (props: {
           <ContextMenu.Item onSelect={() => props.showEditProjectDialog(props.project)}>
             <ContextMenu.ItemLabel>{props.language.t("common.edit")}</ContextMenu.ItemLabel>
           </ContextMenu.Item>
+          <ContextMenu.Item onSelect={openInExplorer}>
+            <ContextMenu.ItemLabel>
+              {navigator.userAgent.includes("Mac")
+                ? props.language.t("session.header.open.finder")
+                : navigator.userAgent.includes("Windows")
+                  ? props.language.t("session.header.open.fileExplorer")
+                  : props.language.t("session.header.open.fileManager")}
+            </ContextMenu.ItemLabel>
+          </ContextMenu.Item>
           <ContextMenu.Item
             data-action="project-workspaces-toggle"
             data-project={base64Encode(props.project.worktree)}
@@ -192,8 +217,8 @@ const ProjectPreviewPanel = (props: {
   workspaceEnabled: Accessor<boolean>
   workspaces: Accessor<string[]>
   label: (directory: string) => string
-  projectSessions: Accessor<ReturnType<typeof sortedRootSessions>>
-  workspaceSessions: (directory: string) => ReturnType<typeof sortedRootSessions>
+  projectSessions: Accessor<GlobalSession[]>
+  workspaceSessions: (directory: string) => GlobalSession[]
   ctx: ProjectSidebarContext
   language: ReturnType<typeof useLanguage>
 }): JSX.Element => (
@@ -301,18 +326,16 @@ export const SortableProject = (props: {
     return `${kind} : ${name}`
   }
 
-  const projectStore = createMemo(() => serverSync().child(props.project.worktree, { bootstrap: false })[0])
-  const isWorking = createMemo(() =>
-    dirs().some((directory) => {
-      const [store] = serverSync().child(directory, { bootstrap: false })
-      return Object.keys(store.session_status).some((id) => store.session_working(id))
-    }),
-  )
-  const projectSessions = createMemo(() => sortedRootSessions(projectStore(), props.sortNow()))
-  const workspaceSessions = (directory: string) => {
-    const [data] = serverSync().child(directory, { bootstrap: false })
-    return sortedRootSessions(data, props.sortNow())
-  }
+  const catalog = useExperimentalSessions()
+  const allSessions = () => catalog.data?.sessions ?? []
+  const isWorking = createMemo(() => {
+    const sessions = allSessions()
+    return dirs().some((directory) =>
+      sessions.some((s) => pathKey(s.directory) === pathKey(directory) && s.model !== undefined),
+    )
+  })
+  const projectSessions = createMemo(() => catalogSessionsForProject(allSessions(), props.project.worktree, props.sortNow()))
+  const workspaceSessions = (directory: string) => catalogSessionsForDirectory(allSessions(), directory, props.sortNow())
   const tile = () => (
     <ProjectTile
       project={props.project}

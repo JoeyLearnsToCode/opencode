@@ -1,0 +1,85 @@
+name: release-win
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: blacksmith-4vcpu-windows-2025
+    if: github.repository == 'anomalyco/opencode'
+    steps:
+      - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
+        with:
+          fetch-tags: true
+
+      - uses: ./.github/actions/setup-bun
+
+      - name: Extract version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace "^v", ""
+          echo "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Build TUI (CLI binary)
+        run: bun run build:tui
+        env:
+          OPENCODE_VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Prepare Desktop
+        run: bun ./scripts/prepare.ts
+        working-directory: packages/desktop
+        env:
+          OPENCODE_VERSION: ${{ steps.version.outputs.version }}
+          OPENCODE_CHANNEL: prod
+
+      - name: Build Desktop app
+        run: bun run build
+        working-directory: packages/desktop
+        env:
+          OPENCODE_CHANNEL: prod
+
+      - name: Package Desktop
+        run: npx electron-builder --win --publish never --config electron-builder.config.ts
+        working-directory: packages/desktop
+        env:
+          OPENCODE_CHANNEL: prod
+
+      - name: Create Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" --target "${{ github.sha }}" --title "${{ github.ref_name }}" --notes "" --draft
+        continue-on-error: true
+
+      - name: Upload CLI artifacts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Get-ChildItem -Path packages/opencode/dist/opencode-windows-*/bin/opencode.exe | ForEach-Object {
+            $dirName = $_.Directory.Parent.Parent.Name
+            $zipPath = "packages/opencode/dist/$dirName.zip"
+            Compress-Archive -Path $_.FullName -DestinationPath $zipPath -Force
+            gh release upload "${{ github.ref_name }}" $zipPath --clobber
+          }
+
+      - name: Upload Desktop artifacts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          Get-ChildItem -Path packages/desktop/dist/opencode-desktop-win-*.exe | ForEach-Object {
+            gh release upload "${{ github.ref_name }}" $_.FullName --clobber
+          }
+          Get-ChildItem -Path packages/desktop/dist/opencode-desktop-win-*.exe.blockmap -ErrorAction SilentlyContinue | ForEach-Object {
+            gh release upload "${{ github.ref_name }}" $_.FullName --clobber
+          }
