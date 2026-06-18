@@ -2,6 +2,43 @@
 - The default branch in this repo is `dev`.
 - Local `main` ref may not exist; use `dev` or `origin/dev` for diffs.
 
+## Package Map
+
+```
+packages/
+  core/         — Engine: Drizzle SQLite schema, session V1/V2, PTY, config, system context.
+                  Deps: effect-drizzle-sqlite, effect-sqlite-node, llm
+  opencode/     — Main CLI app (yargs). Assembles everything via `src/index.ts`.
+                  Deps: llm, plugin, script, sdk, server, tui
+  llm/          — Effect Schema-first LLM core. Protocol/endpoint/auth/framing decomposition.
+                  Zero deps on other opencode packages.
+  plugin/       — Plugin SDK: tool(), tui(), plugin base types. Deps: sdk
+  sdk/js/       — JS/TS SDK client. Generated from OpenAPI. Zero internal deps.
+  script/       — Build/CI script utilities. Zero internal deps.
+  server/       — HTTP server (Hono). Deps: core
+  tui/          — Terminal UI (SolidJS + OpenTUI). Deps: core, plugin, sdk, ui
+  ui/           — Shared SolidJS component library. Deps: core, sdk
+  app/          — Web frontend (SolidJS + Vite). Deps: core, sdk, ui
+  desktop/      — Electron desktop wrapper around app. Deps: app, ui (devDeps)
+  cli/          — Standalone CLI distribution (lildax). Deps: core, sdk, server, tui
+  web/          — Marketing/docs site (Astro + Starlight). Deps: opencode (devDep)
+  enterprise/   — Self-hosted team deployment (SolidJS + Nitro). Deps: core, ui
+  slack/        — Slack bot (Bolt). Deps: sdk
+  function/     — Cloudflare Worker for GitHub App auth. Deps: none
+  http-recorder/— Effect HTTP VCR for testing. Zero internal deps.
+  effect-drizzle-sqlite/ — Drizzle adapter for Effect SQLite. Zero internal deps.
+  effect-sqlite-node/    — Effect SQLite driver for Node.js. Zero internal deps.
+  console/      — Cloud Console monorepo (app, core, support, resource, mail, function).
+                  Deps: ui, each other
+  stats/        — Usage analytics (app, core, server). Deps: ui, each other
+  storybook/    — Storybook for UI components. Deps: ui (devDep)
+  containers/   — Docker/container configs (not an npm package)
+  identity/     — Branding assets (not an npm package)
+  docs/         — Documentation content (not an npm package)
+```
+
+**Dependency direction**: `core` → `effect-drizzle-sqlite` / `effect-sqlite-node` / `llm`. `opencode` (CLI) is the top-level consumer assembling everything. `llm` is independent of session concerns. `ui` is consumed by `app`, `tui`, `enterprise`, `console-app`, `stats-app`.
+
 ## Branch Names
 
 Use a short branch name of at most three words, separated by hyphens. Do not use slashes or type prefixes such as `feat/` or `fix/`.

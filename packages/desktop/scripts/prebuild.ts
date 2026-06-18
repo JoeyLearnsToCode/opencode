@@ -4,6 +4,7 @@ import { $ } from "bun"
 import { resolveChannel } from "./utils"
 
 const channel = resolveChannel()
+await $`rm -rf out dist`
 await $`bun ./scripts/copy-icons.ts ${channel}`
 await $`bun ./scripts/copy-metainfo.ts ${channel}`
 

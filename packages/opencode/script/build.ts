@@ -28,7 +28,26 @@ const createEmbeddedWebUIBundle = async () => {
   console.log(`Building Web UI to embed in the binary`)
   const appDir = path.join(import.meta.dirname, "../../app")
   const dist = path.join(appDir, "dist")
+  await $`rm -rf ${appDir}/dist ${appDir}/node_modules/.vite`
   await $`OPENCODE_CHANNEL=${Script.channel} bun run --cwd ${appDir} build`
+
+  // Resolve git symlink stubs: on Windows, git materializes symlinks as plain-text
+  // files containing the target path. Overwrite these stubs with the real files.
+  const uiDir = path.resolve(import.meta.dirname, "../../ui/src")
+  const resolved = new Set<string>()
+  for await (const file of new Bun.Glob("**/*").scan({ cwd: dist })) {
+    const abs = path.join(dist, file)
+    const stat = await fs.promises.stat(abs)
+    if (stat.size > 200) continue
+    const content = await fs.promises.readFile(abs, "utf-8")
+    const target = path.resolve(path.dirname(abs), content.trim())
+    if (target.startsWith(uiDir) && await fs.promises.stat(target).then((s) => s.isFile()).catch(() => false)) {
+      await fs.promises.copyFile(target, abs)
+      resolved.add(file)
+    }
+  }
+  if (resolved.size) console.log(`resolved ${resolved.size} symlink stub(s): ${[...resolved].join(", ")}`)
+
   const files = (await Array.fromAsync(new Bun.Glob("**/*").scan({ cwd: dist })))
     .map((file) => file.replaceAll("\\", "/"))
     .filter((file) => !file.endsWith(".map"))

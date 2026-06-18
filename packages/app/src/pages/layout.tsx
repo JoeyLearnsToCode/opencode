@@ -523,6 +523,26 @@ export default function Layout(props: ParentProps) {
     element.scrollIntoView({ block: "nearest", behavior: "smooth" })
   }
 
+  const openingDirs = new Set<string>()
+
+  async function openPathIfExists(dir: string) {
+    const key = pathKey(dir)
+    if (openingDirs.has(key)) return
+    openingDirs.add(key)
+    try {
+      const normalized = dir.replaceAll("\\", "/")
+      const result = await serverSDK().client.file.list({ directory: normalized, path: "" })
+      if (result.error) {
+        const last = server.projects.last()
+        if (last) navigateToProject(last)
+        return
+      }
+      layout.projects.open(dir)
+    } finally {
+      openingDirs.delete(key)
+    }
+  }
+
   const currentProject = createMemo(() => {
     const directory = currentDir()
     if (!directory) return
@@ -1770,44 +1790,51 @@ export default function Layout(props: ParentProps) {
       },
       ([ready, slug, id, root, dir]) => {
         if (!ready || !slug || !dir) {
+          if (slug && !dir) {
+            const last = server.projects.last()
+            if (last) navigateToProject(last)
+          }
           activeRoute.session = ""
           activeRoute.sessionProject = ""
           activeRoute.directory = ""
           return
+        }
+
+        const resolvedRoot = root ?? projectRoot(dir)
+
+        if (resolvedRoot && !server.projects.list().some((p) => pathKey(p.worktree) === pathKey(resolvedRoot))) {
+          void openPathIfExists(dir)
         }
 
         if (!id) {
           activeRoute.session = ""
           activeRoute.sessionProject = ""
-          activeRoute.directory = ""
+          activeRoute.directory = dir
           return
         }
 
         const session = `${slug}/${id}`
 
-        if (!root) {
+        if (!resolvedRoot) {
           activeRoute.session = session
           activeRoute.directory = dir
           activeRoute.sessionProject = ""
           return
         }
 
-        if (!server.projects.list().some((p) => pathKey(p.worktree) === pathKey(root))) {
-          layout.projects.open(dir)
-        }
-        if (server.projects.last() !== root) server.projects.touch(root)
+        if (server.projects.last() !== resolvedRoot) server.projects.touch(resolvedRoot)
 
         const changed = session !== activeRoute.session || dir !== activeRoute.directory
         if (changed) {
           activeRoute.session = session
           activeRoute.directory = dir
-          activeRoute.sessionProject = syncSessionRoute(dir, id, root)
+          activeRoute.sessionProject = syncSessionRoute(dir, id, resolvedRoot)
           return
         }
 
-        if (root === activeRoute.sessionProject) return
+        if (resolvedRoot === activeRoute.sessionProject) return
         activeRoute.directory = dir
-        activeRoute.sessionProject = rememberSessionRoute(dir, id, root)
+        activeRoute.sessionProject = rememberSessionRoute(dir, id, resolvedRoot)
       },
     ),
   )
