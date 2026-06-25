@@ -30,6 +30,7 @@ export default defineConfig({
     proxy: {
       "/home": { target: `http://localhost:${serverPort}`, changeOrigin: true },
       "/portal": { target: `http://localhost:${serverPort}`, changeOrigin: true },
+      "/login": { target: `http://localhost:${serverPort}`, changeOrigin: true },
     },
   },
   build: {

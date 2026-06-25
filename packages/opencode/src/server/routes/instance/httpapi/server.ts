@@ -64,6 +64,7 @@ import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { lazy } from "@/util/lazy"
 import { CorsConfig, isAllowedCorsOrigin, type CorsOptions } from "@opencode-ai/server/cors"
 import { portalResponse } from "./portal"
+import { loginResponse } from "./login"
 import { serveUIEffect } from "@/server/shared/ui"
 import { ServerAuth } from "@/server/auth"
 import { InstanceHttpApi, RootHttpApi } from "./api"
@@ -191,6 +192,10 @@ const portalRoute = HttpRouter.use((router) => router.add("GET", "/portal", () =
   Layer.provide(authOnlyRouterLayer),
 )
 
+const loginRoute = HttpRouter.use((router) => router.add("GET", "/login", () => Effect.succeed(loginResponse()))).pipe(
+  Layer.provide(authOnlyRouterLayer),
+)
+
 const uiRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -279,6 +284,7 @@ export function createRoutes(
     docRoute,
     homeRoute,
     portalRoute,
+    loginRoute,
     uiRoute,
   ).pipe(
     Layer.provide([

@@ -13,6 +13,7 @@ export const PUBLIC_UI_PATHS = new Set<string>([
   "/favicon-v3.ico",
   "/apple-touch-icon-v3.png",
   "/social-share.png",
+  "/login",
 ])
 
 export function isPublicUIPath(method: string, pathname: string) {
