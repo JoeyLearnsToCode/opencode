@@ -111,7 +111,6 @@ const baseLayer = Layer.effect(
                   new Entry({
                     path: RelativePath.make(relative + (item.type === "directory" ? path.sep : "")),
                     type: item.type,
-                    mime: item.type === "directory" ? "application/x-directory" : FSUtil.mimeType(absolute),
                   }),
                 ]
               })
@@ -123,6 +122,6 @@ const baseLayer = Layer.effect(
   }),
 )
 
-export const layer = baseLayer.pipe(Layer.provide(FileSystemSearch.defaultLayer), Layer.provide(FSUtil.defaultLayer))
+export const layer = baseLayer.pipe(Layer.provide(FileSystemSearch.locationLayer), Layer.provide(FSUtil.defaultLayer))
 
 export const locationLayer = layer
