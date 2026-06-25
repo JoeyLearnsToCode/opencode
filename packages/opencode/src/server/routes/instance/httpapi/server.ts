@@ -63,6 +63,7 @@ import { Ripgrep } from "@opencode-ai/core/ripgrep"
 import { SessionProjector } from "@opencode-ai/core/session/projector"
 import { lazy } from "@/util/lazy"
 import { CorsConfig, isAllowedCorsOrigin, type CorsOptions } from "@opencode-ai/server/cors"
+import { portalResponse } from "./portal"
 import { serveUIEffect } from "@/server/shared/ui"
 import { ServerAuth } from "@/server/auth"
 import { InstanceHttpApi, RootHttpApi } from "./api"
@@ -182,6 +183,14 @@ const docRoute = HttpRouter.use((router) => router.add("GET", "/doc", () => Effe
   Layer.provide(authOnlyRouterLayer),
 )
 
+const homeRoute = HttpRouter.use((router) => router.add("GET", "/home", () => Effect.succeed(portalResponse()))).pipe(
+  Layer.provide(authOnlyRouterLayer),
+)
+
+const portalRoute = HttpRouter.use((router) => router.add("GET", "/portal", () => Effect.succeed(portalResponse()))).pipe(
+  Layer.provide(authOnlyRouterLayer),
+)
+
 const uiRoute = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const fs = yield* FSUtil.Service
@@ -268,6 +277,8 @@ export function createRoutes(
     instanceRoutes,
     serverRoutes,
     docRoute,
+    homeRoute,
+    portalRoute,
     uiRoute,
   ).pipe(
     Layer.provide([

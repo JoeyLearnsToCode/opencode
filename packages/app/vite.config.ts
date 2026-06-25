@@ -19,12 +19,18 @@ const sentry =
       })
     : false
 
+const serverPort = process.env.VITE_OPENCODE_SERVER_PORT ?? "4096"
+
 export default defineConfig({
   plugins: [desktopPlugin, sentry] as any,
   server: {
     host: "0.0.0.0",
     allowedHosts: true,
     port: 3000,
+    proxy: {
+      "/home": { target: `http://localhost:${serverPort}`, changeOrigin: true },
+      "/portal": { target: `http://localhost:${serverPort}`, changeOrigin: true },
+    },
   },
   build: {
     target: "esnext",

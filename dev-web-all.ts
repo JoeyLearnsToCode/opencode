@@ -31,7 +31,7 @@ const stdoutReader = backend.stdout.getReader()
 while (!port) await Bun.sleep(100)
 
 const frontend = Bun.spawn(
-  ["bun", "--cwd", "packages/app", "dev", "--", "--port", "4444"],
+  ["bun", "run", "--cwd", "packages/app", "dev", "--", "--port", "4444"],
   {
     env: { ...process.env, VITE_OPENCODE_SERVER_PORT: port },
     stdio: ["inherit", "inherit", "inherit"],
