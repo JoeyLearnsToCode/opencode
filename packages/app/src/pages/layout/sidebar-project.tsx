@@ -326,14 +326,16 @@ export const SortableProject = (props: {
     return `${kind} : ${name}`
   }
 
+  const isWorking = createMemo(() =>
+    dirs().some((directory) => {
+      return Object.keys(serverSync().session.data.session_status).some((id) => {
+        if (serverSync().session.get(id)?.directory !== directory) return false
+        return serverSync().session.data.session_working(id)
+      })
+    }),
+  )
   const catalog = useExperimentalSessions()
   const allSessions = () => catalog.data?.sessions ?? []
-  const isWorking = createMemo(() => {
-    const sessions = allSessions()
-    return dirs().some((directory) =>
-      sessions.some((s) => pathKey(s.directory) === pathKey(directory) && s.model !== undefined),
-    )
-  })
   const projectSessions = createMemo(() => catalogSessionsForProject(allSessions(), props.project.worktree, props.sortNow()))
   const workspaceSessions = (directory: string) => catalogSessionsForDirectory(allSessions(), directory, props.sortNow())
   const tile = () => (
