@@ -1,9 +1,11 @@
 import { type GlobalSession } from "@opencode-ai/sdk/v2/client"
-import { createQuery } from "@tanstack/solid-query"
+import { createQuery, useQueryClient } from "@tanstack/solid-query"
+import { createEffect, onCleanup } from "solid-js"
 import { useServerSDK } from "./server-sdk"
 
 export function useExperimentalSessions() {
   const serverSDK = useServerSDK()
+  const queryClient = useQueryClient()
   const scope = () => serverSDK().scope
 
   const query = createQuery(() => ({
@@ -24,6 +26,22 @@ export function useExperimentalSessions() {
     },
     staleTime: 60_000,
   }))
+
+  createEffect(() => {
+    const s = scope()
+    const sdk = serverSDK()
+    const cleanup = sdk.event.listen((e) => {
+      const event = e.details
+      if (
+        event.type === "session.created" ||
+        event.type === "session.updated" ||
+        event.type === "session.deleted"
+      ) {
+        queryClient.invalidateQueries({ queryKey: [s, "experimental", "sessions"] })
+      }
+    })
+    onCleanup(cleanup)
+  })
 
   return query
 }
