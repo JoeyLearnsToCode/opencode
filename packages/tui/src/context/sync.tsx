@@ -142,6 +142,8 @@ export const {
     const fullSyncedSessions = new Set<string>()
     const syncingSessions = new Map<string, Promise<void>>()
     const hydratingSessions = new Map<string, { messages: Set<string>; parts: Set<string> }>()
+    const cursors = new Map<string, string | undefined>()
+    const loadingMore = new Set<string>()
     const touchMessage = (sessionID: string, messageID: string) => {
       hydratingSessions.get(sessionID)?.messages.add(messageID)
     }
@@ -583,7 +585,7 @@ export const {
           const task = (async () => {
             const [session, messages, todo, diff] = await Promise.all([
               sdk.client.session.get({ sessionID }, { throwOnError: true }),
-              sdk.client.session.messages({ sessionID, limit: 100 }),
+              sdk.client.session.messages({ sessionID, limit: 10 }),
               sdk.client.session.todo({ sessionID }),
               sdk.client.session.diff({ sessionID }),
             ])
@@ -640,12 +642,41 @@ export const {
               }),
             )
             fullSyncedSessions.add(sessionID)
+            const c = (messages as { response?: { headers?: Headers } }).response?.headers?.get("X-Next-Cursor") ?? undefined
+            cursors.set(sessionID, c)
           })().finally(() => {
             syncingSessions.delete(sessionID)
             hydratingSessions.delete(sessionID)
           })
           syncingSessions.set(sessionID, task)
           return task
+        },
+        async loadMore(sessionID: string) {
+          const cursor = cursors.get(sessionID)
+          if (!cursor) return
+          if (loadingMore.has(sessionID)) return
+          loadingMore.add(sessionID)
+          try {
+            const response = await sdk.client.session.messages({ sessionID, limit: 10, before: cursor })
+            const data = response.data
+            if (!data || data.length === 0) return
+            const next = (response as { response?: { headers?: Headers } }).response?.headers?.get("X-Next-Cursor") ?? undefined
+            cursors.set(sessionID, next)
+            setStore(
+              produce((draft) => {
+                const current = draft.message[sessionID] ?? []
+                const older = data.map((item) => item.info)
+                draft.message[sessionID] = [...older.toReversed(), ...current]
+                for (const item of data) {
+                  draft.part[item.info.id] = item.parts
+                }
+              }),
+            )
+          } catch {
+            // background load failure is non-fatal
+          } finally {
+            loadingMore.delete(sessionID)
+          }
         },
       },
       bootstrap,

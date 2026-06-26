@@ -304,7 +304,6 @@ export function Session() {
       }
       editor.reconnect(result.data.directory)
       await sync.session.sync(sessionID)
-      if (route.sessionID === sessionID && scroll) scroll.scrollBy(100_000)
     })().catch((error) => {
       if (route.sessionID !== sessionID) return
       toast.show({
@@ -1141,6 +1140,15 @@ export function Session() {
 
   // snap to bottom when session changes
   createEffect(on(() => route.sessionID, toBottom))
+
+  // incremental loading on scroll to top
+  onMount(() => {
+    const interval = setInterval(() => {
+      if (!scroll || scroll.isDestroyed) return
+      if (scroll.scrollTop <= 0) sync.session.loadMore(route.sessionID)
+    }, 300)
+    onCleanup(() => clearInterval(interval))
+  })
 
   return (
     <LocationProvider location={location()}>
