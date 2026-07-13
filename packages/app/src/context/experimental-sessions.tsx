@@ -1,12 +1,39 @@
 import { type GlobalSession } from "@opencode-ai/sdk/v2/client"
-import { createQuery, useQueryClient } from "@tanstack/solid-query"
-import { createEffect, onCleanup } from "solid-js"
-import { useServerSDK } from "./server-sdk"
+import { createQuery, type QueryClient, useQueryClient } from "@tanstack/solid-query"
+import { createEffect, createRoot, onCleanup } from "solid-js"
+import { useServerSDK, type ServerSDK } from "./server-sdk"
+
+function setupSessionListener(serverSDK: () => ServerSDK, queryClient: QueryClient) {
+  createEffect(() => {
+    const s = serverSDK().scope
+    const sdk = serverSDK()
+    const cleanup = sdk.event.listen((e) => {
+      const event = e.details
+      if (
+        event.type === "session.created" ||
+        event.type === "session.updated" ||
+        event.type === "session.deleted"
+      ) {
+        queryClient.invalidateQueries({ queryKey: [s, "experimental", "sessions"] })
+      }
+    })
+    onCleanup(cleanup)
+  })
+}
+
+let listenerCleanup: (() => void) | undefined
 
 export function useExperimentalSessions() {
   const serverSDK = useServerSDK()
   const queryClient = useQueryClient()
   const scope = () => serverSDK().scope
+
+  if (!listenerCleanup) {
+    createRoot((dispose) => {
+      listenerCleanup = dispose
+      setupSessionListener(serverSDK, queryClient)
+    })
+  }
 
   const query = createQuery(() => ({
     queryKey: [scope(), "experimental", "sessions"],
@@ -26,22 +53,6 @@ export function useExperimentalSessions() {
     },
     staleTime: 60_000,
   }))
-
-  createEffect(() => {
-    const s = scope()
-    const sdk = serverSDK()
-    const cleanup = sdk.event.listen((e) => {
-      const event = e.details
-      if (
-        event.type === "session.created" ||
-        event.type === "session.updated" ||
-        event.type === "session.deleted"
-      ) {
-        queryClient.invalidateQueries({ queryKey: [s, "experimental", "sessions"] })
-      }
-    })
-    onCleanup(cleanup)
-  })
 
   return query
 }
