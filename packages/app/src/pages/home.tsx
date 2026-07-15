@@ -1,4 +1,4 @@
-import type { Session } from "@opencode-ai/sdk/v2/client"
+import type { GlobalSession, Session } from "@opencode-ai/sdk/v2/client"
 import {
   type ComponentProps,
   createEffect,
@@ -293,7 +293,58 @@ export function NewHome() {
   })
   const focusedSync = () => focusedServerCtx()?.sync ?? sync()
   const homeSessions = () => focusedSync().homeSessions
-  const projects = createMemo(() => focusedServerCtx()?.projects.list() ?? layout.projects.list())
+  const experimentalLoad = useQuery(() => ({
+    queryKey: [...homeSessions().indexKey, "experimental-projects"],
+    enabled: !!focusedServerCtx(),
+    queryFn: async ({ signal }) => {
+      const ctx = focusedServerCtx()
+      if (!ctx) return []
+      const all: GlobalSession[] = []
+      let cursor: number | undefined
+      do {
+        const res = await ctx.sdk.client.experimental.session.list(
+          { cursor, limit: 200, archived: false },
+          { signal, throwOnError: false },
+        )
+        if (res.data) all.push(...res.data)
+        const next = res.response.headers.get("x-next-cursor")
+        cursor = next ? Number(next) : undefined
+      } while (cursor)
+      return all
+    },
+    staleTime: 60_000,
+  }))
+  const experimentalProjects = createMemo(() => {
+    const sessions = experimentalLoad.data
+    if (!sessions) return undefined
+    const closed = new Set(
+      (focusedServerCtx()?.projects.closedWorktrees() ?? []).map(pathKey),
+    )
+    const seen = new Set<string>()
+    const syncProjects = focusedSync().data.project ?? []
+    const metadata = new Map(syncProjects.map((p) => [pathKey(p.worktree), p]))
+    const result: LocalProject[] = []
+    for (const session of sessions) {
+      const p = session.project
+      if (!p?.worktree) continue
+      const key = pathKey(p.worktree)
+      if (closed.has(key) || seen.has(key)) continue
+      seen.add(key)
+      const meta = metadata.get(key)
+      result.push({
+        ...meta,
+        id: p.id,
+        name: p.name ?? meta?.name,
+        worktree: p.worktree,
+        expanded: true,
+      })
+    }
+    return result
+  })
+  const projects = createMemo(() => {
+    if (experimentalLoad.data && experimentalProjects()) return experimentalProjects()!
+    return focusedServerCtx()?.projects.list() ?? layout.projects.list()
+  })
   const recentlyClosed = createMemo(
     () => focusedServerCtx()?.projects.recentlyClosed() ?? layout.projects.recentlyClosed(),
   )
@@ -461,13 +512,7 @@ export function NewHome() {
   function selectProject(conn: ServerConnection.Any, directory: string) {
     const key = ServerConnection.key(conn)
     if (global.servers.health[key]?.healthy === false) return
-    if (
-      !global
-        .ensureServerCtx(conn)
-        .projects.list()
-        .some((project) => project.worktree === directory)
-    )
-      return
+    if (!projects().some((project) => project.worktree === directory)) return
     setSelection(toggleHomeProjectSelection(selection(), key, directory))
   }
 

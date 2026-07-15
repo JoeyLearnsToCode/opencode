@@ -149,6 +149,7 @@ function createServerCtx(
       ...projects,
       list: projectsList,
       recentlyClosed: recentlyClosedList,
+      closedWorktrees: projects.recentlyClosed,
     },
   }
 }
