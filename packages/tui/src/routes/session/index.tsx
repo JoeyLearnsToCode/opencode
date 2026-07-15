@@ -1280,7 +1280,7 @@ export function Session() {
                         <AssistantMessage
                           last={lastAssistant()?.id === message.id}
                           message={message as AssistantMessage}
-                          parts={sync.data.part[message.id] ?? []}
+                          parts={mergeReasoningParts(sync.data.part[message.id] ?? [])}
                         />
                       </Match>
                     </Switch>
@@ -1573,6 +1573,37 @@ const PART_MAPPING = {
   text: TextPart,
   tool: ToolPart,
   reasoning: ReasoningPart,
+}
+
+function mergeReasoningParts(parts: Part[]): Part[] {
+  let hasConsecutive = false
+  for (let i = 1; i < parts.length; i++) {
+    if (parts[i - 1]?.type === "reasoning" && parts[i]?.type === "reasoning") {
+      hasConsecutive = true
+      break
+    }
+  }
+  if (!hasConsecutive) return parts
+
+  const result: Part[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
+    if (part.type !== "reasoning") {
+      result.push(part)
+      continue
+    }
+    const first = part as ReasoningPart
+    let text = first.text
+    let end = first.time.end
+    while (i + 1 < parts.length && parts[i + 1]?.type === "reasoning") {
+      i++
+      const next = parts[i] as ReasoningPart
+      text = text + "\n" + next.text
+      if (!end && next.time.end) end = next.time.end
+    }
+    result.push({ ...first, text, time: { ...first.time, end } })
+  }
+  return result
 }
 
 const INLINE_TOOL_ICON_WIDTH = 2
