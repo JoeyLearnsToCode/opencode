@@ -967,6 +967,7 @@
     box-shadow: none;
     text-align: left;
     width: 100%;
+    user-select: text;
     cursor: pointer;
     transition:
       background-color 0.15s ease,
@@ -1500,6 +1501,7 @@ body:not([data-new-layout]) {
     }
 
     [data-slot="question-option"] {
+      user-select: text;
       background-color: var(--surface-raised-stronger-non-alpha);
       border: 1px solid var(--border-weak-base);
 

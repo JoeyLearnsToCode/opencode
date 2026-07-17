@@ -48,7 +48,11 @@ function Option(props: {
       aria-checked={props.picked}
       disabled={props.disabled}
       onFocus={props.onFocus}
-      onClick={props.onClick}
+      onClick={(e) => {
+        const sel = window.getSelection()
+        if (sel?.toString() && e.currentTarget.contains(sel.anchorNode)) return
+        props.onClick()
+      }}
     >
       <Mark multi={props.multi} picked={props.picked} />
       <span data-slot="question-option-main">
