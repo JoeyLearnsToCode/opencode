@@ -396,6 +396,8 @@ function unsupportedParts(msgs: ModelMessage[], model: Provider.Model): ModelMes
       const filename = part.type === "file" ? part.filename : undefined
       const modality = mimeToModality(mime)
       if (!modality) return part
+      // 自用特性：没有声明视觉能力的模型请求中上传图片时，不做能力检查，很多模型实际上支持视觉，但一个个配置太麻烦。
+      if (modality === 'image') return part
       if (model.capabilities.input[modality]) return part
 
       const name = filename ? `"${filename}"` : modality
