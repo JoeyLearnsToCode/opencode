@@ -6,6 +6,7 @@ import { BackgroundJob } from "@/background/job"
 import { Session } from "@/session/session"
 import { SessionID, MessageID } from "../session/schema"
 import { MessageV2 } from "../session/message-v2"
+import { parseModel } from "@/provider/provider"
 import { Agent } from "../agent/agent"
 import { deriveSubagentSessionPermission } from "../agent/subagent-permissions"
 import type { SessionPrompt } from "../session/prompt"
@@ -178,10 +179,12 @@ export const TaskTool = Tool.define(
       if (msg.info.role !== "assistant") return yield* Effect.fail(new Error("Not an assistant message"))
       const variant = msg.info.variant
 
-      const model = next.model ?? {
-        modelID: msg.info.modelID,
-        providerID: msg.info.providerID,
-      }
+      const model = next.model ?? (next.name === "explore" && cfg.small_model
+        ? parseModel(cfg.small_model)
+        : {
+            modelID: msg.info.modelID,
+            providerID: msg.info.providerID,
+          })
       const metadata = {
         parentSessionId: ctx.sessionID,
         sessionId: nextSession.id,
