@@ -42,6 +42,7 @@ import { DialogServerV2 } from "@/components/settings-v2/dialog-server-v2"
 import { ServerConnection, serverName, useServer } from "@/context/server"
 import { sessionHasOpenTab, useTabs } from "@/context/tabs"
 import { useServerSync } from "@/context/server-sync"
+import { useServerSDK } from "@/context/server-sdk"
 import { useLanguage } from "@/context/language"
 import { useNotification } from "@/context/notification"
 import {
@@ -68,7 +69,6 @@ import { preloadMarkdown } from "@opencode-ai/session-ui/markdown-cache"
 import { archiveHomeSession } from "./home-session-archive"
 import { shouldOpenSessionInBackground } from "./home-session-open"
 import { showToast } from "@/utils/toast"
-import { fileManagerApp } from "@/utils/file-manager"
 import {
   loadHomeSessionIndex,
   retainHomeSessions,
@@ -1206,22 +1206,26 @@ function HomeProjectRow(props: {
 }) {
   const global = useGlobal()
   const platform = usePlatform()
+  const serverSDK = useServerSDK()
   const serverUnreachable = () => global.servers.health[ServerConnection.key(props.server)]?.healthy === false
   const [state, setState] = createStore({ menuOpen: false })
-  const canRevealInFileManager = () =>
-    platform.platform === "desktop" && !!platform.openPath && ServerConnection.local(props.server)
-  const fileManagerActionLabel = () =>
-    props.language.t(
-      fileManagerApp(platform.platform === "desktop" ? (platform.os ?? "unknown") : "unknown").actionLabel,
-    )
-  const revealInFileManager = () => {
-    if (!platform.openPath) return
-    platform.openPath(props.project.worktree).catch((err: unknown) =>
-      showToast({
-        title: props.language.t("common.requestFailed"),
-        description: errorMessage(err, props.language.t("common.requestFailed")),
-      }),
-    )
+  const fileManagerLabel = () => {
+    if (navigator.userAgent.includes("Mac")) return props.language.t("session.header.open.finder")
+    if (navigator.userAgent.includes("Windows")) return props.language.t("session.header.open.fileExplorer")
+    return props.language.t("session.header.open.fileManager")
+  }
+  const openInExplorer = () => {
+    const dir = props.project.worktree
+    if (platform.openPath) {
+      platform.openPath(dir).catch((err: unknown) =>
+        showToast({
+          title: props.language.t("common.requestFailed"),
+          description: errorMessage(err, props.language.t("common.requestFailed")),
+        }),
+      )
+    } else {
+      serverSDK().client.openExplorer(dir.replaceAll("\\", "/")).catch(() => {})
+    }
   }
   return (
     <div class="group/project relative flex h-7 min-w-0 items-center rounded-[6px]">
@@ -1264,9 +1268,7 @@ function HomeProjectRow(props: {
               <MenuV2.Item onSelect={() => props.editProject(props.server, props.project)}>
                 {props.language.t("dialog.project.edit.title")}
               </MenuV2.Item>
-              <Show when={canRevealInFileManager()}>
-                <MenuV2.Item onSelect={revealInFileManager}>{fileManagerActionLabel()}</MenuV2.Item>
-              </Show>
+              <MenuV2.Item onSelect={openInExplorer}>{fileManagerLabel()}</MenuV2.Item>
               <MenuV2.Item
                 disabled={props.unseenCount === 0}
                 onSelect={() => props.clearNotifications(props.server, props.project)}

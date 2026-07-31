@@ -447,7 +447,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
     },
     view: {
       placeholder: designPlaceholder,
-      agent:
+      agent: createMemo(() =>
         props.controls.agents.visible && props.controls.agents.options.length > 0
           ? {
               options: () => props.controls.agents.options.map((name) => ({ id: name, label: name })),
@@ -456,6 +456,7 @@ export function usePromptInputV2Controller(props: PromptInputV2ControllerProps):
               keybind: () => command.keybindParts("agent.cycle"),
             }
           : undefined,
+      ),
       variant: {
         options: () => variants().map((value) => ({ id: value, label: value })),
         current: () => props.controls.model.selection.variant.current() ?? "default",
