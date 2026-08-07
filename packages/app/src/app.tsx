@@ -56,13 +56,14 @@ import { PromptProvider } from "@/context/prompt"
 import { ServerConnection, ServerProvider, serverName, useServer } from "@/context/server"
 import { SettingsProvider, useSettings } from "@/context/settings"
 import { TabsProvider, useTabs, type DraftTab } from "@/context/tabs"
-import { SDKProvider, useSDK } from "@/context/sdk"
+import { SDKProvider } from "@/context/sdk"
 import { WslServersProvider } from "@/wsl/context"
-import DirectoryLayout, { DirectoryDataProvider } from "@/pages/directory-layout"
+import DirectoryLayout, { DirectoryDataProvider, decodeDirectory } from "@/pages/directory-layout"
 import LegacyLayout from "@/pages/layout"
 import NewLayout from "@/pages/layout-new"
 import { ErrorPage } from "./pages/error"
 import { useCheckServerHealth } from "./utils/server-health"
+import { showToast } from "@/utils/toast"
 import { legacySessionHref, legacySessionServer, requireServerKey, sessionHref } from "./utils/session-route"
 import { createSessionLineage } from "@/pages/session/session-lineage"
 
@@ -74,8 +75,6 @@ const NewSession = lazy(() => import("@/pages/new-session"))
 const SessionRoute = () => {
   const settings = useSettings()
   const params = useParams()
-  const [search] = useSearchParams<{ draftId?: string; prompt?: string }>()
-  const sdk = useSDK()
   const server = useServer()
   const tabs = useTabs()
 
@@ -90,15 +89,6 @@ const SessionRoute = () => {
       </Show>
     )
   }
-
-  // When the new layout is enabled, the legacy new-session route (/:dir/session with no id)
-  // is replaced by a draft at /new-session?draftId=…
-  createEffect(() => {
-    if (!settings.general.newLayoutDesigns()) return
-    if (params.id || search.draftId) return
-    if (!tabs.ready() || !sdk().directory) return
-    tabs.newDraft({ server: server.key, directory: sdk().directory }, search.prompt)
-  })
 
   return (
     <SessionRouteErrorBoundary sessionID={params.id}>
@@ -593,17 +583,19 @@ function Routes(props: { serverScoped?: JSX.Element }) {
           {
             <>
               <Route path="/" component={LegacyHome} />
+              <Route path="/:dir" component={DirectoryLayout}>
+                <Route path="/" component={() => <Navigate href="session" />} />
+                <Route path="/session/:id?" component={SessionRoute} />
+              </Route>
               <Route path="/server/:serverKey/session/:id" component={LegacyTargetSessionRoute} />
             </>
           }
         </Show>
-        <Route path="/:dir" component={DirectoryLayout}>
-          <Route path="/" component={() => <Navigate href="session" />} />
-          <Route path="/session/:id?" component={SessionRoute} />
-        </Route>
       </Route>
       <Show when={settings.general.newLayoutDesigns()}>
         <Route path="/" component={NewHome} />
+        <Route path="/:dir" component={NewLayoutDirSessionRedirect} />
+        <Route path="/:dir/session" component={NewLayoutDirectorySession} />
         <Route path="/:dir/session/:id" component={NewLayoutLegacySessionRedirect} />
         <Route path="/server/:serverKey/session/:id" component={TargetSessionRoute} />
       </Show>
@@ -631,4 +623,37 @@ function NewLayoutLegacySessionRedirect() {
       />
     </Show>
   )
+}
+
+function NewLayoutDirSessionRedirect() {
+  const params = useParams<{ dir: string }>()
+  return <Navigate href={`/${params.dir}/session`} />
+}
+
+function NewLayoutDirectorySession() {
+  const params = useParams<{ dir: string }>()
+  const language = useLanguage()
+  const navigate = useNavigate()
+  const server = useServer()
+  const tabs = useTabs()
+  const [search] = useSearchParams<{ prompt?: string }>()
+  let created = false
+
+  createEffect(() => {
+    if (created || !tabs.ready()) return
+    created = true
+    const directory = params.dir ? decodeDirectory(params.dir) : undefined
+    if (!directory) {
+      showToast({
+        variant: "error",
+        title: language.t("common.requestFailed"),
+        description: language.t("directory.error.invalidUrl"),
+      })
+      navigate("/", { replace: true })
+      return
+    }
+    void tabs.newDraft({ server: server.key, directory }, search.prompt)
+  })
+
+  return null
 }
