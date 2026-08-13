@@ -9,6 +9,12 @@ type SessionStore = {
   path: { directory: string }
 }
 
+export function compareSessionTime(a: Session, b: Session) {
+  const updated = (b.time.updated ?? b.time.created) - (a.time.updated ?? a.time.created)
+  if (updated !== 0) return updated
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+}
+
 function sortSessions(now: number) {
   const oneMinuteAgo = now - 60 * 1000
   return (a: Session, b: Session) => {
@@ -29,10 +35,10 @@ const isRootVisibleSession = (session: Session, directory: string) =>
 export const roots = (store: SessionStore) =>
   (store.session ?? []).filter((session) => isRootVisibleSession(session, store.path.directory))
 
-export const sortedRootSessions = (store: SessionStore, now: number) => roots(store).sort(sortSessions(now))
+export const sortedRootSessions = (store: SessionStore, _now: number) => roots(store).sort(compareSessionTime)
 
-export const latestRootSession = (stores: SessionStore[], now: number) =>
-  stores.flatMap(roots).sort(sortSessions(now))[0]
+export const latestRootSession = (stores: SessionStore[], _now: number) =>
+  stores.flatMap(roots).sort(compareSessionTime)[0]
 
 export function hasProjectPermissions<T>(
   request: Record<string, T[] | undefined> | undefined,
