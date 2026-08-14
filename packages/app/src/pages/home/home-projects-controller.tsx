@@ -38,10 +38,6 @@ export function createHomeProjectsController(home: HomeController) {
     return [project.worktree, ...(project.sandboxes ?? [])]
   }
 
-  function canRevealProject(conn: ServerConnection.Any) {
-    return ServerConnection.local(conn)
-  }
-
   return {
     copy: {
       language,
@@ -109,7 +105,6 @@ export function createHomeProjectsController(home: HomeController) {
       move: (conn: ServerConnection.Any, worktree: string, index: number) => {
         home.server.context(conn).projects.move(worktree, index)
       },
-      canReveal: canRevealProject,
       reveal: (conn: ServerConnection.Any, project: LocalProject) => {
         if (platform.openPath) {
           platform.openPath(project.worktree).catch((cause: unknown) =>

@@ -16,7 +16,6 @@ export function HomeProjects(props: { projects: HomeProjectsController; scroll: 
       collapsed={props.projects.server.collapsed}
       canDefaultServer={props.projects.server.canDefault}
       defaultServerKey={props.projects.server.defaultKey}
-      canRevealProject={props.projects.project.canReveal}
       unseenCount={props.projects.project.unseenCount}
       onWheel={props.scroll.viewport.containWheel}
       onChooseProject={props.projects.project.choose}
