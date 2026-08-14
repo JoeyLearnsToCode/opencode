@@ -31,6 +31,7 @@ export function HomeProjects(props: { projects: HomeProjectsController; scroll: 
       onEditProject={props.projects.project.edit}
       onRevealProject={props.projects.project.reveal}
       onClearNotifications={props.projects.project.clearNotifications}
+      onReleaseResources={props.projects.project.releaseResources}
       onCloseProject={props.projects.project.close}
       onOpenSettings={props.projects.utility.settings}
       onOpenHelp={props.projects.utility.help}

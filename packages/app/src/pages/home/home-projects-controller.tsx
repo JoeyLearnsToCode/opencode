@@ -84,6 +84,17 @@ export function createHomeProjectsController(home: HomeController) {
           .filter((directory) => state.project.unseenCount(directory) > 0)
           .forEach((directory) => state.project.markViewed(directory))
       },
+      releaseResources: (conn: ServerConnection.Any, project: LocalProject) => {
+        void Promise.allSettled(
+          directories(project).map((directory) => serverSDK().client.instance.dispose({ directory })),
+        ).then((results) => {
+          if (results.some((result) => result.status === "rejected")) {
+            showToast({ title: language.t("common.requestFailed") })
+            return
+          }
+          showToast({ title: language.t("home.project.resourcesReleased") })
+        })
+      },
       choose: (conn: ServerConnection.Any) => {
         if (home.server.health(conn)?.healthy === false) return
         pickDirectory({

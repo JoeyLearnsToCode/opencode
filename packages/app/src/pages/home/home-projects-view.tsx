@@ -54,6 +54,7 @@ export type HomeProjectsViewProps = {
   onEditProject: (server: ServerConnection.Any, project: LocalProject) => void
   onRevealProject: (server: ServerConnection.Any, project: LocalProject) => void
   onClearNotifications: (server: ServerConnection.Any, project: LocalProject) => void
+  onReleaseResources: (server: ServerConnection.Any, project: LocalProject) => void
   onCloseProject: (server: ServerConnection.Any, directory: string) => void
   onOpenSettings: () => void
   onOpenHelp: () => void
@@ -560,6 +561,9 @@ function HomeProjectRow(
                 onSelect={() => props.onClearNotifications(props.server, props.project)}
               >
                 {props.language.t("sidebar.project.clearNotifications")}
+              </MenuV2.Item>
+              <MenuV2.Item onSelect={() => props.onReleaseResources(props.server, props.project)}>
+                {props.language.t("home.project.releaseResources")}
               </MenuV2.Item>
               <MenuV2.Separator />
               <MenuV2.Item onSelect={() => props.onCloseProject(props.server, props.project.worktree)}>

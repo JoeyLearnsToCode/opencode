@@ -726,6 +726,8 @@ export const dict = {
   "home.title": "主页",
   "home.projects": "项目",
   "home.project.add": "添加项目",
+  "home.project.releaseResources": "释放资源",
+  "home.project.resourcesReleased": "资源已释放",
   "home.recentlyClosed": "最近关闭",
   "home.server.collapse": "折叠服务器项目",
   "home.server.expand": "展开服务器项目",
