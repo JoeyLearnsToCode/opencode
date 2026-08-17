@@ -16,10 +16,25 @@ function deletionOnly(part: ToolPart) {
   return filediff.additions === 0 && typeof filediff.deletions === "number" && filediff.deletions > 0
 }
 
+export function hasAutoDiffPart(part: ToolPart) {
+  if (!("metadata" in part.state)) return false
+  const metadata = part.state.metadata
+  const input = part.state.input
+  if (typeof metadata?.diff !== "string") return false
+  if (typeof input?.filePath !== "string" && typeof input?.path !== "string") return false
+  return /edit|write|patch|hashline/i.test(part.tool)
+}
+
 export function partDefaultOpen(part: PartType, shell = false, edit = false) {
   if (part.type !== "tool") return
   if (part.tool === "bash" || part.tool === "shell") return shell
-  if (part.tool === "edit" || part.tool === "write" || part.tool === "patch" || part.tool === "apply_patch") {
+  if (
+    part.tool === "edit" ||
+    part.tool === "write" ||
+    part.tool === "patch" ||
+    part.tool === "apply_patch" ||
+    hasAutoDiffPart(part)
+  ) {
     if (!edit) return false
     return !deletionOnly(part)
   }

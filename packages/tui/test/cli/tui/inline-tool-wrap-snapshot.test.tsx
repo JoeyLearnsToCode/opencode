@@ -228,6 +228,13 @@ describe("TUI inline tool wrapping", () => {
     expect(toolDisplay("plugin_tool")).toBe("generic")
   })
 
+  test("maps hashline tools to native displays", () => {
+    expect(toolDisplay("hashline_edit")).toBe("edit")
+    expect(toolDisplay("hashline_write")).toBe("write")
+    expect(toolDisplay("hashline_read")).toBe("read")
+    expect(toolDisplay("hashline_other")).toBe("generic")
+  })
+
   test("replaces pending copy when a tool fails before completion", async () => {
     const frame = await renderFrame(() => <FailedPendingToolFixture />, { width: 72, height: 3 })
     expect(frame).toContain("Patch failed")

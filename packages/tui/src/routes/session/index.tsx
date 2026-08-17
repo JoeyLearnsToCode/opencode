@@ -2699,7 +2699,9 @@ const toolDisplays = new Set([
 ])
 
 export function toolDisplay(tool: string) {
-  return toolDisplays.has(tool) ? tool : "generic"
+  if (toolDisplays.has(tool)) return tool
+  const base = tool.startsWith("hashline_") ? tool.slice("hashline_".length) : ""
+  return base === "read" || base === "edit" || base === "write" ? base : "generic"
 }
 
 function recordValue(value: unknown): Record<string, unknown> | undefined {
